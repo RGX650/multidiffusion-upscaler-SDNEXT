@@ -22,6 +22,61 @@ else:
     InputAccordion = None
 
 
+class Sampler:
+    def __init__(self, funcname):
+        self.funcname = funcname
+        self.func = funcname
+        self.extra_params = []
+        self.sampler_noises = None
+        self.stop_at = None
+        self.eta = None
+        self.config: SamplerData = None  # set by the function calling the constructor
+        self.last_latent = None
+        self.s_min_uncond = None
+        self.s_churn = 0.0
+        self.s_tmin = 0.0
+        self.s_tmax = float('inf')
+        self.s_noise = 1.0
+
+        self.eta_option_field = 'eta_ancestral'
+        self.eta_infotext_field = 'Eta'
+        self.eta_default = 1.0
+
+        self.conditioning_key = shared.sd_model.model.conditioning_key
+
+        self.p = None
+        self.model_wrap_cfg = None
+        self.sampler_extra_args = None
+        self.options = {}
+
+    def callback_state(self, d):
+        step = d['i']
+
+        if self.stop_at is not None and step > self.stop_at:
+            raise InterruptedException
+
+        state.sampling_step = step
+        shared.total_tqdm.update()
+
+    def launch_sampling(self, steps, func):
+        self.model_wrap_cfg.steps = steps
+        self.model_wrap_cfg.total_steps = self.config.total_steps(steps)
+        state.sampling_steps = steps
+        state.sampling_step = 0
+
+        try:
+            return func()
+        except RecursionError:
+            print(
+                'Encountered RecursionError during sampling, returning last latent. '
+                'rho >5 with a polyexponential scheduler may cause this error. '
+                'You should try to use a smaller rho value instead.'
+            )
+            return self.last_latent
+        except InterruptedException:
+            return self.last_latent
+
+
 CFG_PATH = os.path.join(scripts.basedir(), 'region_configs')
 BBOX_MAX_NUM = min(getattr(shared.cmd_opts, 'md_max_regions', 8), 16)
 
@@ -538,9 +593,11 @@ class Script(scripts.Script):
         if hasattr(Script, "create_random_tensors_original_md"):
             processing.create_random_tensors = Script.create_random_tensors_original_md
             del Script.create_random_tensors_original_md
-        if hasattr(sd_samplers_common.Sampler, "callback_ori"):
-            sd_samplers_common.Sampler.callback_state = sd_samplers_common.Sampler.callback_ori
-            del sd_samplers_common.Sampler.callback_ori
+        #if hasattr(sd_samplers_common.Sampler, "callback_ori"):
+            #sd_samplers_common.Sampler.callback_state = sd_samplers_common.Sampler.callback_ori
+        if hasattr(Sampler, "callback_ori"):
+            Sampler.callback_state = sd_samplers_common.Sampler.callback_ori
+            del Sampler.callback_ori
         if hasattr(processing, "create_infotext_ori"):
             processing.create_infotext = processing.create_infotext_ori
             del processing.create_infotext_ori
