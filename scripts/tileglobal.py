@@ -6,7 +6,7 @@ import numpy as np
 import gradio as gr
 
 from external import rng
-from modules import sd_samplers, images, shared, devices, processing, scripts, sd_samplers_common, rng
+from modules import sd_samplers, images, shared, devices, processing, scripts, sd_samplers_common
 from modules.shared import opts
 from modules.processing import opt_f, get_fixed_seed
 from modules.ui import gr_show
